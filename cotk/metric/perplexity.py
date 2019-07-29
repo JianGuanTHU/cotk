@@ -35,7 +35,7 @@ class PerplexityMetric(MetricBase):
 					   invalid_vocab=False, \
 					   full_check=False \
 			  ):
-		super().__init__()
+		super().__init__(__name__, 1)
 		self.dataloader = dataloader
 		self.reference_allvocabs_key = reference_allvocabs_key
 		self.reference_len_key = reference_len_key
@@ -337,7 +337,7 @@ class MultiTurnPerplexityMetric(MetricBase):
 					   invalid_vocab=False, \
 					   full_check=False \
 			  ):
-		super().__init__()
+		super().__init__(__name__, 1)
 		self.dataloader = dataloader
 		self.multi_turn_reference_allvocabs_key = multi_turn_reference_allvocabs_key
 		self.multi_turn_reference_len_key = multi_turn_reference_len_key

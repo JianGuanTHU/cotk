@@ -115,8 +115,12 @@ class MetricBase(LoadClassInterface, metaclass=DocStringInheritor):
 			the environment variable ``CPU_COUNT`` will be used	when it is set,
 			or all available cpu will be used otherwise."""
 
-	def __init__(self):
+	def __init__(self, name, version):
 		self.unordered_hash = UnorderedSha256()
+		self.name = name
+		self.version = version
+		self.unordered_hash.update_data(name)
+		self.unordered_hash.update_data(version)
 		self.closed = False
 
 	def _hash_relevant_data(self, data_list):
