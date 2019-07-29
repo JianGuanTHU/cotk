@@ -6,6 +6,7 @@ from inspect import signature
 import pkg_resources
 import json
 import copy
+import weakref
 
 #pylint: disable=global-statement
 
@@ -107,48 +108,32 @@ class BaseHooksListener:
 class SimpleHooksListener(BaseHooksListener):
 	r'''An simple recorder'''
 	def __init__(self):
-		self.dataloader_set = {}
-		self.metric_set = {}
-		self.hash_set = {}
-		self.wordvec_set = {}
-
-	def close(self, result_dic):
-		record = {
+		self.record = {
 			"cotk_version": pkg_resources.require("cotk")[0].version,
 			"dataloader": [],
 			"wordvec": []
 		}
-		record_dataloader_set = {}
+		self.dataloader_set = weakref.WeakKeyDictionary()
+		self.metric_set = weakref.WeakKeyDictionary()
+		self.hash_set = {}
+
+	def close(self, result_dic):
 		for key, value in result_dic.items():
-			if "hashvalue" in key:
-				try:
-					metric = self.hash_set[key + value]
-				except KeyError:
-					print("WARNING: Unknown hashvalue for hooks. Cotk can't fetch the metric information about %s: %s. " % (key, value) +
-					"It can be caused by an unhooked metric close function.")
-					continue
-				try:
-					metric_args = self.metric_set[metric]
-				except KeyError:
-					print("WARNING: Unknown metrics for hooks. Cotk can't fetch the metric information about %s. " % (metric) +
-					"It can be caused by an unhooked metric.")
-					continue
-				dataloader = metric_args['dataloader']
-				if dataloader not in record_dataloader_set:
-					record_dataloader_set[dataloader] = []
-				del metric_args['dataloader']
-				record_dataloader_set[dataloader].append(metric_args)
-		for dataloader, metrics in record_dataloader_set.items():
-			try:
-				dataloader_args = self.dataloader_set[dataloader]
-				record['dataloader'].append([dataloader_args, metrics])
-			except KeyError:
-				print("WARNING: Unknown dataloader for hooks. Cotk can't fetch the dataloader information about %s. " % (dataloader) +
-					"It can be caused by an unhooked dataloader.")
+			if "hashvalue" not in key:
 				continue
-		for _, wordvec_args in self.wordvec_set.items():
-			record['wordvec'].append(wordvec_args)
-		return record
+			try:
+				dataset_args, metric_args = self.hash_set[key + value]
+			except KeyError:
+				print("WARNING: Unknown hashvalue for hooks. Cotk can't fetch the metric information about %s:%s. " % (key, value) +
+					"It can be caused by an unhooked metric.close.")
+				continue
+			for dataloader, metric in self.record['dataloader']:
+				if id(dataloader) == id(dataset_args):
+					metric.append(metric_args)
+					break
+			else:
+				self.record['dataloader'].append((dataset_args, [metric_args]))
+		return self.record
 
 	def add_dataloader(self, obj, dataloader, args):
 		args = compress_dict(args)
@@ -165,13 +150,27 @@ class SimpleHooksListener(BaseHooksListener):
 
 	def invoke_metric_close(self, obj, return_dict):
 		for key, value in return_dict.items():
-			if "hashvalue" in key:
-				self.hash_set[key + value] = obj
+			if "hashvalue" not in key:
+				continue
+			try:
+				metric_args = self.metric_set[obj]
+			except KeyError:
+				print("WARNING: Unknown metrics for hooks. Cotk can't fetch the metric information about %s. " % (obj) +
+					"It can be caused by an unhooked metric.")
+				continue
+			try:
+				dataset_args = self.dataloader_set[metric_args['dataloader']]
+			except KeyError:
+				print("WARNING: Unknown dataloader for hooks. Cotk can't fetch the dataloader information about %s. " % (metric_args['dataloader']) +
+					"It can be caused by an unhooked dataloader.")
+				continue
+			metric_args = {key: value for key, value in self.metric_set[obj].items() if key != "dataloader"}
+			self.hash_set[key + value] = (dataset_args, metric_args)
 
 	def add_wordvec(self, obj, wordvec, args):
 		args = compress_dict(args)
 		args['clsname'] = wordvec
-		self.wordvec_set[obj] = args
+		self.record['wordvec'].append(args)
 
 def start_recorder():
 	r'''Start recorder'''
