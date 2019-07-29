@@ -121,16 +121,31 @@ class SimpleHooksListener(BaseHooksListener):
 		record_dataloader_set = {}
 		for key, value in result_dic.items():
 			if "hashvalue" in key:
-				metric = self.hash_set[key + value]
-				metric_args = self.metric_set[metric]
+				try:
+					metric = self.hash_set[key + value]
+				except KeyError:
+					print("WARNING: Unknown hashvalue for hooks. Cotk can't fetch the metric information about %s: %s. " % (key, value) +
+					"It can be caused by an unhooked metric close function.")
+					continue
+				try:
+					metric_args = self.metric_set[metric]
+				except KeyError:
+					print("WARNING: Unknown metrics for hooks. Cotk can't fetch the metric information about %s. " % (metric) +
+					"It can be caused by an unhooked metric.")
+					continue
 				dataloader = metric_args['dataloader']
 				if dataloader not in record_dataloader_set:
 					record_dataloader_set[dataloader] = []
 				del metric_args['dataloader']
 				record_dataloader_set[dataloader].append(metric_args)
 		for dataloader, metrics in record_dataloader_set.items():
-			dataloader_args = self.dataloader_set[dataloader]
-			record['dataloader'].append([dataloader_args, metrics])
+			try:
+				dataloader_args = self.dataloader_set[dataloader]
+				record['dataloader'].append([dataloader_args, metrics])
+			except KeyError:
+				print("WARNING: Unknown dataloader for hooks. Cotk can't fetch the dataloader information about %s. " % (dataloader) +
+					"It can be caused by an unhooked dataloader.")
+				continue
 		for _, wordvec_args in self.wordvec_set.items():
 			record['wordvec'].append(wordvec_args)
 		return record

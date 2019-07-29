@@ -29,7 +29,7 @@ class PerplexityMetric(MetricBase):
 			Default: ``False``.
 	'''
 
-	@hooks.hook_dataloader
+	@hooks.hook_metric
 	def __init__(self, dataloader, \
 					   reference_allvocabs_key="ref_allvocabs", \
 					   reference_len_key="ref_length", \
